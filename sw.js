@@ -1,7 +1,7 @@
 const CACHE_NAME = 'walk-navi-v2'; // バージョンを上げてキャッシュ更新を促す
 const ASSETS_TO_CACHE = [
   './',
-  './ido_keido.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
