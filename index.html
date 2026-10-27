@@ -75,6 +75,9 @@
   .card-top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
   .badge { background: #feebc8; color: #7b341e; font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
   .stat { font-size: .72rem; color: var(--sub); }
+  .hint { width: 100%; font-size: .85rem; line-height: 1.6; color: #7b341e; background: #fffaf0; border: 1px solid #feebc8; border-radius: 12px; padding: 8px 12px; text-align: center; }
+  .hint { cursor: pointer; }
+  .hint small { display: block; font-size: .7rem; color: var(--mid); font-weight: 700; }
   .reading { font-size: 1.9rem; font-weight: 700; color: var(--primary); letter-spacing: .08em; text-align: center; line-height: 1.3; }
   .meaning { width: 100%; font-size: .85rem; line-height: 1.6; color: #4a5568; background: #f7fafc; border: 1px dashed #cbd5e0; border-radius: 12px; padding: 10px 12px; text-align: center; }
 
@@ -162,6 +165,7 @@
       <button id="speak" class="icon-btn" aria-label="読みを聞く">🗣️</button>
     </div>
     <div id="reading" class="reading">読み込み中…</div>
+    <div id="hint" class="hint" hidden></div>
 
     <!-- 書くモード -->
     <section id="write-ask" class="write" style="display:contents">
@@ -203,7 +207,7 @@
   </footer>
 
   <div class="data">
-    <span>DB状態：<strong id="db-status">接続中</strong></span>
+    <span><span id="app-ver"></span> DB：<strong id="db-status">接続中</strong></span>
     <select id="strict" aria-label="判定のきびしさ">
       <option value="easy">判定：やさしい</option>
       <option value="normal">判定：ふつう</option>
@@ -1014,6 +1018,7 @@ function showCard() {
   showStat(card);
   if (audioOn) speak(card.reading);
 
+  showHint(card, mode === 'write');
   if (mode === 'write') {
     charIdx = 0; drawings = []; strokes = [];
     setView('ask'); sizePad(); redrawPad(); renderSlots(); updateAskButtons();
@@ -1023,6 +1028,23 @@ function showCard() {
     $('meaning-s').textContent = card.meaning; $('meaning-s').classList.remove('show');
     startTimer();
   }
+}
+
+// 書く前のヒント：意味を見せる。答えの漢字は ○ に置きかえて隠す
+function showHint(card, on) {
+  const h = $('hint');
+  if (!on || !card.meaning) { h.hidden = true; return; }
+  const hide = new Set([...card.kanji]);
+  const masked = [...card.meaning].map(ch => hide.has(ch) ? '○' : ch).join('');
+  const same = cards.filter(c => c.reading === card.reading && c.kanji !== card.kanji).length;
+  h.innerHTML = '';
+  if (same) { const sm = document.createElement('small'); sm.textContent = '同じ読みの熟語があります'; h.appendChild(sm); }
+  const t = document.createElement('span');
+  const hasMask = masked !== card.meaning;
+  t.textContent = 'ヒント：' + masked + (hasMask ? '（タップで○を表示）' : '');
+  h.appendChild(t);
+  h.onclick = hasMask ? () => { t.textContent = 'ヒント：' + card.meaning; h.onclick = null; } : null;
+  h.hidden = false;
 }
 
 function judgeAll() {
@@ -1047,6 +1069,7 @@ function judgeAll() {
   record(card, ok);
   if (!ok) requeue(card);
   showVerdict(ok, false);
+  $('hint').hidden = true;
   setView('result');
 }
 function showVerdict(ok, manual) {
@@ -1164,8 +1187,22 @@ $('strict').onchange = e => { strict = e.target.value; try { localStorage.setIte
 window.addEventListener('error', e => setStatus('エラー：' + e.message));
 const boot = () => { (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {}); initDB(); };
 // アプリ化：オフライン用の仕組みを登録し、学習データを消されにくくする
+// アプリの版。index.html を直したら、この数字と sw.js の CACHE を一緒に上げる
+const APP_VERSION = 4;
+$('app-ver').textContent = 'v' + APP_VERSION;
+
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      // アプリに戻ってくるたびに、新しい版が出ていないか確認
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
+  // 新しい版に切り替わったら、一度だけ自動で読み直す
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return; reloaded = true; location.reload();
+  });
 }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
