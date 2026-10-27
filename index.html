@@ -1,797 +1,630 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>漢検熟語フラッシュカード (IndexedDB対応完全版)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@500;700&family=Noto+Sans+JP:wght@400;600;800&family=Yuji+Syuku&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      color-scheme: light;
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      --bg-color: #f4ece1;
-      --card-bg: #fffbf7;
-      --primary: #9b2c2c;
-      --primary-light: #fff5f5;
-      --text-main: #2d3748;
-      --text-sub: #718096;
-      --accent-green: #2f855a;
-      --accent-yellow: #d69e2e;
-      --border-color: #e2e8f0;
-      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>漢検フラッシュ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Yuji+Syuku&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #f4ece1;
+    --card: #fffbf7;
+    --primary: #9b2c2c;
+    --primary-soft: #fff5f5;
+    --text: #2d3748;
+    --sub: #718096;
+    --line: #e2e8f0;
+    --ok: #2f855a;
+    --ok-soft: #f0fff4;
+    --mid: #b7791f;
+    --mid-soft: #fffaf0;
+    --ng: #c53030;
+    --pad: #ffffff;
+    --guide: #f0e4d4;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; background: var(--bg); scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    height: 100%;
+    font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex; justify-content: center;
+    padding: 8px;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app {
+    width: 100%; max-width: 440px; height: 100%; max-height: 900px;
+    background: var(--card);
+    border-radius: 22px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,.08);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 8px; border-bottom: 1px solid var(--line); gap: 8px; }
+  .title { font-family: 'Yuji Syuku', serif; font-size: 1.15rem; color: var(--primary); white-space: nowrap; }
+  .head-right { display: flex; gap: 6px; align-items: center; }
+  .seg { display: flex; background: #edf2f7; border-radius: 999px; padding: 3px; }
+  .seg button { border: none; background: none; border-radius: 999px; padding: 5px 12px; font: inherit; font-size: .8rem; font-weight: 700; color: var(--sub); cursor: pointer; }
+  .seg button.on { background: var(--primary); color: #fff; }
+  .icon-btn { border: none; background: #edf2f7; border-radius: 999px; width: 32px; height: 32px; font-size: .95rem; cursor: pointer; }
+  .icon-btn.muted { background: #fed7d7; }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-    }
+  nav.levels { display: flex; gap: 6px; padding: 8px 12px; background: #f7fafc; border-bottom: 1px solid var(--line); }
+  nav.levels button { flex: 1; border: none; background: none; border-radius: 10px; padding: 7px 0; font: inherit; font-size: .82rem; font-weight: 700; color: var(--sub); cursor: pointer; }
+  nav.levels button.on { background: var(--primary); color: #fff; }
 
-    html { height: 100%; background: #f4ece1; }
-    body {
-      font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100%;
-      height: 100%;
-      overflow: hidden;
-      padding: 8px;
-    }
+  .progress { display: flex; align-items: center; gap: 10px; padding: 8px 16px 2px; font-size: .75rem; color: var(--sub); font-weight: 700; }
+  .bar { flex: 1; height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--primary); transition: width .3s; }
 
-    /* スマホ縦型容器 (9:16比率ベース) */
-    .app-container {
-      width: 100%;
-      max-width: 420px;
-      height: 100%;
-      max-height: 880px;
-      background: var(--card-bg);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
+  main { flex: 1; overflow-y: auto; padding: 8px 14px 6px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .card-top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .badge { background: #feebc8; color: #7b341e; font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .stat { font-size: .72rem; color: var(--sub); }
+  .reading { font-size: 1.9rem; font-weight: 700; color: var(--primary); letter-spacing: .08em; text-align: center; line-height: 1.3; }
+  .meaning { width: 100%; font-size: .85rem; line-height: 1.6; color: #4a5568; background: #f7fafc; border: 1px dashed #cbd5e0; border-radius: 12px; padding: 10px 12px; text-align: center; }
 
-    /* ヘッダー */
-    .header {
-      padding: 12px 16px 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
-    }
+  /* 書く */
+  .slots { display: flex; gap: 8px; justify-content: center; }
+  .slot { width: 52px; height: 52px; border-radius: 10px; border: 2px solid var(--line); background: var(--pad); position: relative; display: grid; place-items: center; color: #cbd5e0; font-size: 1.2rem; cursor: pointer; }
+  .slot.cur { border-color: var(--primary); }
+  .slot canvas { width: 100%; height: 100%; }
+  .pad-wrap { width: min(100%, 300px); aspect-ratio: 1; position: relative; border-radius: 16px; background: var(--pad); border: 2px solid var(--line); overflow: hidden; touch-action: none; }
+  .pad-wrap::before, .pad-wrap::after { content: ""; position: absolute; background: none; pointer-events: none; }
+  .pad-wrap::before { left: 50%; top: 6%; bottom: 6%; border-left: 2px dashed var(--guide); }
+  .pad-wrap::after { top: 50%; left: 6%; right: 6%; border-top: 2px dashed var(--guide); }
+  #pad { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .pad-hint { position: absolute; bottom: 8px; width: 100%; text-align: center; font-size: .72rem; color: #cbd5e0; pointer-events: none; }
 
-    .title-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+  .results { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .res { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .res-box { width: 78px; height: 78px; border-radius: 12px; border: 2px solid var(--line); background: var(--pad); position: relative; overflow: hidden; }
+  .res-box .ans { position: absolute; inset: 0; display: grid; place-items: center; font-size: 60px; color: rgba(155,44,44,.16); line-height: 1; }
+  .res-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .res-mark { font-size: .8rem; font-weight: 700; }
+  .res-mark.ok { color: var(--ok); } .res-mark.mid { color: var(--mid); } .res-mark.ng { color: var(--ng); }
+  .answer { font-size: 3.2rem; font-weight: 700; letter-spacing: .05em; line-height: 1.1; }
+  .verdict { font-size: 1rem; font-weight: 700; padding: 4px 14px; border-radius: 999px; }
+  .verdict.ok { background: var(--ok-soft); color: var(--ok); }
+  .verdict.mid { background: var(--mid-soft); color: var(--mid); }
+  .verdict.ng { background: var(--primary-soft); color: var(--ng); }
 
-    .app-title {
-      font-family: 'Yuji Syuku', serif;
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: var(--primary);
-    }
+  /* 見る */
+  .timer { position: relative; width: 44px; height: 44px; }
+  .timer svg { width: 44px; height: 44px; transform: rotate(-90deg); }
+  .timer circle { fill: none; stroke-width: 4; }
+  .timer .bg { stroke: #edf2f7; }
+  .timer .fg { stroke: var(--primary); stroke-dasharray: 126; stroke-dashoffset: 0; }
+  .timer span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .75rem; font-weight: 700; color: var(--sub); }
+  .flash-kanji { font-size: 4.2rem; font-weight: 700; opacity: 0; transition: opacity .3s; }
+  .flash-kanji.show, .meaning.show { opacity: 1; }
+  .see .meaning { opacity: 0; transition: opacity .3s; }
+  .see .meaning.show { opacity: 1; }
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+  footer { padding: 8px 14px 10px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); }
+  .row { display: flex; gap: 8px; }
+  .btn { flex: 1; border: none; border-radius: 14px; padding: 13px 0; font: inherit; font-size: .92rem; font-weight: 700; cursor: pointer; }
+  .btn:active { transform: scale(.98); }
+  .btn.main { background: var(--primary); color: #fff; }
+  .btn.soft { background: #edf2f7; color: #4a5568; }
+  .btn.ng { background: var(--primary-soft); color: var(--ng); border: 1px solid #fed7d7; }
+  .btn.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #c6f6d5; }
+  .btn:disabled { opacity: .4; }
 
-    .audio-btn {
-      background: #edf2f7;
-      border: none;
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s;
-    }
-
-    .audio-btn.muted {
-      background: #fed7d7;
-      color: #9b2c2c;
-    }
-
-    /* 級選択タブ */
-    .level-tabs {
-      display: flex;
-      padding: 8px 12px;
-      gap: 6px;
-      background: #f7fafc;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 8px 0;
-      border: none;
-      border-radius: 12px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text-sub);
-      background: transparent;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-    }
-
-    .tab-btn.active {
-      background: var(--primary);
-      color: white;
-      box-shadow: 0 2px 6px rgba(155, 44, 44, 0.3);
-    }
-
-    /* 進捗バー */
-    .progress-wrapper {
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .progress-bar-bg {
-      flex: 1;
-      height: 6px;
-      background: #edf2f7;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--primary);
-      transition: width 0.3s ease;
-    }
-
-    .progress-text {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-sub);
-      min-width: 45px;
-      text-align: right;
-    }
-
-    /* メインカード領域 */
-    .card-container {
-      flex: 1;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-    }
-
-    .flashcard {
-      width: 100%;
-      height: 100%;
-      max-height: 480px;
-      background: #ffffff;
-      border: 2px solid #edf2f7;
-      border-radius: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      padding: 24px 16px;
-      position: relative;
-      text-align: center;
-    }
-
-    .card-top-info {
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .badge-level {
-      background: #feebc8;
-      color: #7b341e;
-      padding: 2px 10px;
-      border-radius: 10px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-
-    .speech-trigger {
-      background: none;
-      border: none;
-      font-size: 1.3rem;
-      cursor: pointer;
-      opacity: 0.7;
-    }
-
-    /* ひらがな読み */
-    .reading-display {
-      font-family: 'Kiwi Maru', serif;
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: var(--primary);
-      margin-top: 10px;
-      letter-spacing: 2px;
-      min-height: 2.2rem;
-    }
-
-    /* 2秒タイマー円形アニメーション */
-    .timer-ring-container {
-      margin: 12px 0;
-      position: relative;
-      width: 50px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .timer-svg {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-
-    .timer-circle-bg {
-      fill: none;
-      stroke: #edf2f7;
-      stroke-width: 4;
-    }
-
-    .timer-circle-progress {
-      fill: none;
-      stroke: var(--primary);
-      stroke-width: 4;
-      stroke-dasharray: 126;
-      stroke-dashoffset: 0;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 2s linear;
-    }
-
-    .timer-text {
-      position: absolute;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-sub);
-    }
-
-    /* 漢字表示部分 */
-    .kanji-box {
-      min-height: 110px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-    }
-
-    .kanji-display {
-      font-family: 'Yuji Syuku', serif;
-      font-size: 3.8rem;
-      font-weight: 700;
-      color: var(--text-main);
-      letter-spacing: 4px;
-      opacity: 0;
-      transform: scale(0.9);
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    .kanji-display.revealed {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    /* 意味説明 */
-    .meaning-box {
-      background: #f7fafc;
-      padding: 12px;
-      border-radius: 12px;
-      width: 100%;
-      font-size: 0.85rem;
-      color: #4a5568;
-      line-height: 1.4;
-      min-height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px dashed #cbd5e0;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .meaning-box.revealed {
-      opacity: 1;
-    }
-
-    /* ボトム操作ボタン (親指位置) */
-    .control-panel {
-      padding: 12px 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .action-row {
-      display: flex;
-      gap: 10px;
-    }
-
-    .btn {
-      padding: 14px 0;
-      border: none;
-      border-radius: 16px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .btn-review {
-      flex: 1;
-      background: #fff5f5;
-      color: #c53030;
-      border: 1.5px solid #feb2b2;
-    }
-
-    .btn-master {
-      flex: 1;
-      background: #f0fff4;
-      color: #276749;
-      border: 1.5px solid #9ae6b4;
-    }
-
-    .btn-next {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-      box-shadow: 0 4px 10px rgba(155, 44, 44, 0.25);
-    }
-
-    .btn:active {
-      transform: scale(0.97);
-    }
-
-    /* フッターデータ管理領域 */
-    .footer-data-section {
-      padding: 6px 16px 12px;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.75rem;
-      color: var(--text-sub);
-    }
-
-    .file-input-label {
-      background: #edf2f7;
-      padding: 4px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      color: #4a5568;
-      font-weight: 600;
-    }
-
-    #csv-file-input {
-      display: none;
-    }
-  </style>
+  .data { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 10px; font-size: .7rem; color: var(--sub); gap: 8px; }
+  .data label { background: #edf2f7; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-weight: 700; white-space: nowrap; }
+  .data input { display: none; }
+  [hidden] { display: none !important; }
+  button:focus-visible, label:focus-within { outline: 3px solid #f6ad55; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
 </head>
 <body>
-
-  <div class="app-container">
-    <!-- ヘッダー -->
-    <header class="header">
-      <div class="title-group">
-        <span class="app-title">漢検フラッシュ</span>
+<div class="app">
+  <header>
+    <span class="title">漢検フラッシュ</span>
+    <div class="head-right">
+      <div class="seg" role="tablist" aria-label="モード">
+        <button id="mode-write" class="on">書く</button>
+        <button id="mode-see">見る</button>
       </div>
-      <div class="header-actions">
-        <button id="audio-toggle" class="audio-btn" title="電車内マナーモード">
-          <span id="audio-icon">🔊</span>
-          <span id="audio-text">音声 ON</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- 級選択タブ -->
-    <nav class="level-tabs">
-      <button class="tab-btn active" data-level="3級">3級 (<span id="count-3級">0</span>)</button>
-      <button class="tab-btn" data-level="準2級">準2級 (<span id="count-準2級">0</span>)</button>
-      <button class="tab-btn" data-level="2級">2級 (<span id="count-2級">0</span>)</button>
-    </nav>
-
-    <!-- プログレスバー -->
-    <div class="progress-wrapper">
-      <div class="progress-bar-bg">
-        <div id="progress-fill" class="progress-bar-fill"></div>
-      </div>
-      <div id="progress-counter" class="progress-text">0 / 0</div>
+      <button id="audio-toggle" class="icon-btn" aria-label="音声のオンオフ">🔊</button>
     </div>
+  </header>
 
-    <!-- メインカード -->
-    <main class="card-container">
-      <div class="flashcard">
-        <div class="card-top-info">
-          <span id="card-level-badge" class="badge-level">3級</span>
-          <button id="speech-btn" class="speech-trigger" title="音声を聴く">🔊</button>
-        </div>
+  <nav class="levels">
+    <button class="on" data-level="3級">3級 (<span id="count-3級">0</span>)</button>
+    <button data-level="準2級">準2級 (<span id="count-準2級">0</span>)</button>
+    <button data-level="2級">2級 (<span id="count-2級">0</span>)</button>
+  </nav>
 
-        <!-- 読み（ひらがな） -->
-        <div id="reading-text" class="reading-display">読み込み中...</div>
+  <div class="progress"><div class="bar"><div id="bar"></div></div><span id="counter">0 / 0</span></div>
 
-        <!-- 2秒タイマーアニメーション -->
-        <div class="timer-ring-container">
-          <svg class="timer-svg" viewBox="0 0 44 44">
-            <circle class="timer-circle-bg" cx="22" cy="22" r="20" />
-            <circle id="timer-progress" class="timer-circle-progress" cx="22" cy="22" r="20" />
-          </svg>
-          <span id="timer-sec" class="timer-text">2s</span>
-        </div>
-
-        <!-- 漢字表示 -->
-        <div class="kanji-box">
-          <div id="kanji-text" class="kanji-display">漢字</div>
-        </div>
-
-        <!-- 意味表示 -->
-        <div id="meaning-text" class="meaning-box">意味がここに表示されます</div>
-      </div>
-    </main>
-
-    <!-- 操作パネル (親指位置) -->
-    <footer class="control-panel">
-      <div class="action-row">
-        <button id="btn-review" class="btn btn-review">⚠️ 要復習</button>
-        <button id="btn-master" class="btn btn-master">✨ 覚えた</button>
-      </div>
-      <button id="btn-next" class="btn btn-next">次へ進む ➔</button>
-    </footer>
-
-    <!-- 外部データ追加設定 (IndexedDB活用) -->
-    <div class="footer-data-section">
-      <span>DB状態: <strong id="db-status">接続中</strong></span>
-      <label class="file-input-label">
-        📂 外部JSON/CSV追加
-        <input type="file" id="csv-file-input" accept=".json,.csv">
-      </label>
+  <main id="main">
+    <div class="card-top">
+      <span id="badge" class="badge">3級</span>
+      <span id="stat" class="stat"></span>
+      <button id="speak" class="icon-btn" aria-label="読みを聞く">🗣️</button>
     </div>
+    <div id="reading" class="reading">読み込み中…</div>
+
+    <!-- 書くモード -->
+    <section id="write-ask" class="write" style="display:contents">
+      <div id="slots" class="slots"></div>
+      <div class="pad-wrap"><canvas id="pad"></canvas><div class="pad-hint" id="pad-hint">ここに指で書く</div></div>
+    </section>
+    <section id="write-result" class="write" hidden style="display:contents">
+      <div id="verdict" class="verdict"></div>
+      <div id="answer" class="answer"></div>
+      <div id="results" class="results"></div>
+      <div id="meaning-w" class="meaning"></div>
+    </section>
+
+    <!-- 見るモード -->
+    <section id="see" class="see" hidden style="display:contents">
+      <div class="timer"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="20"/><circle id="ring" class="fg" cx="22" cy="22" r="20"/></svg><span id="sec">2s</span></div>
+      <div id="flash-kanji" class="flash-kanji"></div>
+      <div id="meaning-s" class="meaning"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div id="ft-ask" class="row">
+      <button id="undo" class="btn soft">1画戻す</button>
+      <button id="clear" class="btn soft">消す</button>
+      <button id="next-char" class="btn main" style="flex:1.4">次の字</button>
+    </div>
+    <div id="ft-result" class="row" hidden>
+      <button id="override" class="btn ok">正解にする</button>
+      <button id="next-q" class="btn main" style="flex:1.4">次の問題</button>
+    </div>
+    <div id="ft-see" hidden>
+      <div class="row" style="margin-bottom:8px">
+        <button id="mark-review" class="btn ng">要復習</button>
+        <button id="mark-ok" class="btn ok">覚えた</button>
+      </div>
+      <button id="see-next" class="btn main" style="width:100%">次へ進む</button>
+    </div>
+  </footer>
+
+  <div class="data">
+    <span>DB状態：<strong id="db-status">接続中</strong></span>
+    <label>データ追加<input type="file" id="file-input" accept=".json,.csv"></label>
   </div>
+</div>
 
-  <script>
-    // 1. 初期内蔵データセット (正誤補正済み: 分裂 -> ぶんれつ)
-    const initialDataset = [
-      // 3級
-      { level: '3級', kanji: '分裂', reading: 'ぶんれつ', meaning: '一つだったものがいくつかに分かれること。' },
-      { level: '3級', kanji: '丁寧', reading: 'ていねい', meaning: '細かいところまで注意が行き届いていること。' },
-      { level: '3級', kanji: '義務', reading: 'ぎむ', meaning: '立場上、当然しなければならないこと。' },
-      { level: '3級', kanji: '絶望', reading: 'ぜつぼう', meaning: 'すべての希望を失ってしまうこと。' },
-      { level: '3級', kanji: '観察', reading: 'かんさつ', meaning: '物事の様子を注意深く見る事。' },
-      
-      // 準2級
-      { level: '準2級', kanji: '摩擦', reading: 'まさつ', meaning: '物と物とがすり合わさること。意見の衝突。' },
-      { level: '準2級', kanji: '矛盾', reading: 'むじゅん', meaning: '二つの主張がつじつまの合わないこと。' },
-      { level: '準2級', kanji: '隠蔽', reading: 'いんぺい', meaning: '覆い隠して人の目に触れさせないこと。' },
-      { level: '準2級', kanji: '顕著', reading: 'けんちょ', meaning: '際立って目立つさま。' },
-      
-      // 2級
-      { level: '2級', kanji: '網羅', reading: 'もうら', meaning: '残らず集めて包み入れること。' },
-      { level: '2級', kanji: '脆弱', reading: 'ぜいじゃく', meaning: '脆くて弱いこと。' },
-      { level: '2級', kanji: '躊躇', reading: 'ちゅうちょ', meaning: 'ためらうこと。決断できずに迷うこと。' },
-      { level: '2級', kanji: '破綻', reading: 'はたん', meaning: '物事が破れてうまくいかなくなること。' }
-    ];
+<script>
+// ===== 1. 内蔵データ =====
+const initialDataset = [
+  { level: '3級', kanji: '分裂', reading: 'ぶんれつ', meaning: '一つだったものがいくつかに分かれること。' },
+  { level: '3級', kanji: '丁寧', reading: 'ていねい', meaning: '細かいところまで注意が行き届いていること。' },
+  { level: '3級', kanji: '義務', reading: 'ぎむ', meaning: '立場上、当然しなければならないこと。' },
+  { level: '3級', kanji: '絶望', reading: 'ぜつぼう', meaning: 'すべての希望を失ってしまうこと。' },
+  { level: '3級', kanji: '観察', reading: 'かんさつ', meaning: '物事の様子を注意深く見ること。' },
+  { level: '準2級', kanji: '摩擦', reading: 'まさつ', meaning: '物と物とがすり合わさること。意見の衝突。' },
+  { level: '準2級', kanji: '矛盾', reading: 'むじゅん', meaning: '二つの主張がつじつまの合わないこと。' },
+  { level: '準2級', kanji: '隠蔽', reading: 'いんぺい', meaning: '覆い隠して人の目に触れさせないこと。' },
+  { level: '準2級', kanji: '顕著', reading: 'けんちょ', meaning: '際立って目立つさま。' },
+  { level: '2級', kanji: '網羅', reading: 'もうら', meaning: '残らず集めて包み入れること。' },
+  { level: '2級', kanji: '脆弱', reading: 'ぜいじゃく', meaning: 'もろくて弱いこと。' },
+  { level: '2級', kanji: '躊躇', reading: 'ちゅうちょ', meaning: 'ためらうこと。決断できずに迷うこと。' },
+  { level: '2級', kanji: '破綻', reading: 'はたん', meaning: '物事が破れてうまくいかなくなること。' }
+];
+const LEVELS = ['3級', '準2級', '2級'];
 
-    // 2. アプリの状態変数
-    let db = null;
-    let currentLevel = '3級';
-    let currentCards = [];
-    let currentIndex = 0;
-    let timerId = null;
-    let isAudioEnabled = true;
+// ===== 2. 状態 =====
+let db = null, started = false, memoryCards = [];
+let mode = 'write', currentLevel = '3級', cards = [], idx = 0;
+let audioOn = true, timerId = null;
+let charIdx = 0, drawings = [], strokes = [], lastResult = null;
+const $ = id => document.getElementById(id);
 
-    // DOM要素
-    const readingEl = document.getElementById('reading-text');
-    const kanjiEl = document.getElementById('kanji-text');
-    const meaningEl = document.getElementById('meaning-text');
-    const badgeEl = document.getElementById('card-level-badge');
-    const timerProgress = document.getElementById('timer-progress');
-    const timerSecEl = document.getElementById('timer-sec');
-    const progressFill = document.getElementById('progress-fill');
-    const progressCounter = document.getElementById('progress-counter');
-    const audioToggleBtn = document.getElementById('audio-toggle');
-    const audioIcon = document.getElementById('audio-icon');
-    const audioText = document.getElementById('audio-text');
+// ===== 3. データベース =====
+function setStatus(t) { $('db-status').textContent = t; }
 
-    // 3. IndexedDBの初期化（使えない環境ではメモリ上のデータで動かす）
-    let started = false;
-    let memoryCards = [];
+function useMemory(reason) {
+  if (started) return;
+  started = true; db = null;
+  memoryCards = initialDataset.map((c, i) => ({ ...c, id: i + 1, status: 'unlearned', correct: 0, wrong: 0 }));
+  setStatus('一時保存（' + reason + '）');
+  updateCounts(); loadLevel(currentLevel);
+}
 
-    function setStatus(text) {
-      const el = document.getElementById('db-status');
-      if (el) el.textContent = text;
+function initDB() {
+  const watchdog = setTimeout(() => useMemory('DB応答なし'), 3000);
+  let req;
+  try { req = indexedDB.open('KanjiQuizDB', 1); }
+  catch (e) { clearTimeout(watchdog); useMemory('DB使用不可'); return; }
+  req.onupgradeneeded = e => {
+    const d = e.target.result;
+    if (!d.objectStoreNames.contains('kanji_cards')) {
+      const s = d.createObjectStore('kanji_cards', { keyPath: 'id', autoIncrement: true });
+      s.createIndex('level', 'level', { unique: false });
     }
+  };
+  req.onsuccess = e => {
+    clearTimeout(watchdog);
+    if (started) return;
+    started = true; db = e.target.result;
+    setStatus('保存中（この端末）');
+    seed();
+  };
+  req.onerror = () => { clearTimeout(watchdog); useMemory('DBエラー'); };
+  req.onblocked = () => setStatus('他のタブで開いています');
+}
 
-    function useMemoryFallback(reason) {
-      if (started) return;
-      started = true;
-      db = null;
-      memoryCards = initialDataset.map((item, i) => ({ ...item, id: i + 1, status: 'unlearned' }));
-      setStatus('メモリ動作（' + reason + '）');
-      updateCounts();
-      loadLevelCards(currentLevel);
-    }
+function seed() {
+  const c = db.transaction('kanji_cards').objectStore('kanji_cards').count();
+  c.onsuccess = () => {
+    if (c.result > 0) { updateCounts(); loadLevel(currentLevel); return; }
+    const tx = db.transaction('kanji_cards', 'readwrite');
+    const s = tx.objectStore('kanji_cards');
+    initialDataset.forEach(it => s.add({ ...it, status: 'unlearned', correct: 0, wrong: 0 }));
+    tx.oncomplete = () => { updateCounts(); loadLevel(currentLevel); };
+  };
+}
 
-    function initIndexedDB() {
-      // 3秒たっても応答がなければ、待たずにメモリ動作へ切り替え
-      const watchdog = setTimeout(() => useMemoryFallback('DB応答なし'), 3000);
+function updateCounts() {
+  LEVELS.forEach(l => {
+    const el = $('count-' + l);
+    if (!db) { el.textContent = memoryCards.filter(c => c.level === l).length; return; }
+    const r = db.transaction('kanji_cards').objectStore('kanji_cards').index('level').count(IDBKeyRange.only(l));
+    r.onsuccess = () => el.textContent = r.result;
+  });
+}
 
-      let request;
-      try {
-        if (!window.indexedDB) throw new Error('非対応');
-        request = indexedDB.open("KanjiQuizDB", 1);
-      } catch (err) {
-        clearTimeout(watchdog);
-        useMemoryFallback('DB使用不可');
-        return;
+function orderCards(list) {
+  // 要復習 → 未学習 → 覚えた の順、同じ中はシャッフル
+  const rank = { review: 0, unlearned: 1, mastered: 2 };
+  return list.map(c => [rank[c.status] ?? 1, Math.random(), c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
+}
+
+function loadLevel(level) {
+  currentLevel = level;
+  const done = list => { cards = orderCards(list); idx = 0; showCard(); };
+  if (!db) { done(memoryCards.filter(c => c.level === level)); return; }
+  const r = db.transaction('kanji_cards').objectStore('kanji_cards').index('level').getAll(IDBKeyRange.only(level));
+  r.onsuccess = () => done(r.result);
+}
+
+function saveCard(card) {
+  if (!db) return;
+  db.transaction('kanji_cards', 'readwrite').objectStore('kanji_cards').put(card);
+}
+
+function record(card, ok) {
+  if (ok) { card.correct = (card.correct || 0) + 1; card.status = 'mastered'; }
+  else { card.wrong = (card.wrong || 0) + 1; card.status = 'review'; }
+  saveCard(card);
+  showStat(card);
+}
+
+// ===== 4. 手書き判定（形の比較） =====
+const N = 64;
+function toGrid(cv) {
+  const w = cv.width, h = cv.height, d = cv.getContext('2d').getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 100) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const g = new Uint8Array(N * N);
+  if (x1 < 0) return g;
+  // 縦横を別々に伸ばして枠に合わせる（字の縦横比の個人差を吸収）。細長い字は伸ばしすぎない
+  const bw0 = x1 - x0 + 1, bh0 = y1 - y0 + 1, big = Math.max(bw0, bh0);
+  const bw = Math.sqrt(Math.max(bw0, big * 0.5) * big), bh = Math.sqrt(Math.max(bh0, big * 0.5) * big);
+  x0 -= (bw - bw0) / 2; y0 -= (bh - bh0) / 2;
+  const sxs = (N * 0.86) / bw, sys = (N * 0.86) / bh, ox = (N - bw * sxs) / 2, oy = (N - bh * sys) / 2;
+  for (let Y = 0; Y < N; Y++) for (let X = 0; X < N; X++) {
+    const sx0 = Math.floor((X - ox) / sxs + x0), sx1 = Math.ceil((X + 1 - ox) / sxs + x0);
+    const sy0 = Math.floor((Y - oy) / sys + y0), sy1 = Math.ceil((Y + 1 - oy) / sys + y0);
+    let hit = 0;
+    for (let yy = Math.max(sy0, 0); yy < Math.min(sy1, h) && !hit; yy++)
+      for (let xx = Math.max(sx0, 0); xx < Math.min(sx1, w); xx++)
+        if (d[(yy * w + xx) * 4 + 3] > 100) { hit = 1; break; }
+    g[Y * N + X] = hit;
+  }
+  return g;
+}
+function thin(g) { // 線を1画素の骨格にする（Zhang-Suen法）
+  const a = Uint8Array.from(g), P = (x, y) => (x < 0 || y < 0 || x >= N || y >= N) ? 0 : a[y * N + x];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let step = 0; step < 2; step++) {
+      const del = [];
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        if (!a[y * N + x]) continue;
+        const p = [P(x, y-1), P(x+1, y-1), P(x+1, y), P(x+1, y+1), P(x, y+1), P(x-1, y+1), P(x-1, y), P(x-1, y-1)];
+        const B = p.reduce((s, v) => s + v, 0); if (B < 2 || B > 6) continue;
+        let A = 0; for (let i = 0; i < 8; i++) if (!p[i] && p[(i + 1) % 8]) A++;
+        if (A !== 1) continue;
+        if (step === 0 ? (p[0]*p[2]*p[4] || p[2]*p[4]*p[6]) : (p[0]*p[2]*p[6] || p[0]*p[4]*p[6])) continue;
+        del.push(y * N + x);
       }
-
-      request.onupgradeneeded = (e) => {
-        const upgradeDb = e.target.result;
-        if (!upgradeDb.objectStoreNames.contains("kanji_cards")) {
-          const store = upgradeDb.createObjectStore("kanji_cards", { keyPath: "id", autoIncrement: true });
-          store.createIndex("level", "level", { unique: false });
-        }
-      };
-
-      request.onsuccess = (e) => {
-        clearTimeout(watchdog);
-        if (started) return;
-        started = true;
-        db = e.target.result;
-        setStatus('準備完了');
-        try {
-          checkAndSeedDB();
-        } catch (err) {
-          started = false;
-          useMemoryFallback('DB読込失敗');
-        }
-      };
-
-      request.onerror = () => {
-        clearTimeout(watchdog);
-        useMemoryFallback('DBエラー');
-      };
-
-      request.onblocked = () => {
-        setStatus('他のタブを閉じてください');
-      };
+      if (del.length) { changed = true; del.forEach(i => a[i] = 0); }
     }
-
-    // 初期データのシーディング
-    function checkAndSeedDB() {
-      const tx = db.transaction("kanji_cards", "readonly");
-      const store = tx.objectStore("kanji_cards");
-      const countReq = store.count();
-
-      countReq.onsuccess = () => {
-        if (countReq.result === 0) {
-          const writeTx = db.transaction("kanji_cards", "readwrite");
-          const writeStore = writeTx.objectStore("kanji_cards");
-          initialDataset.forEach(item => {
-            writeStore.add({ ...item, status: 'unlearned' });
-          });
-          writeTx.oncomplete = () => {
-            updateCounts();
-            loadLevelCards(currentLevel);
-          };
-          writeTx.onerror = () => { started = false; useMemoryFallback('DB書込失敗'); };
-        } else {
-          updateCounts();
-          loadLevelCards(currentLevel);
-        }
-      };
-      countReq.onerror = () => { started = false; useMemoryFallback('DB読込失敗'); };
+  }
+  return a;
+}
+function dilate(g, r) {
+  const o = new Uint8Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y * N + x])
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const X = x + dx, Y = y + dy;
+      if (X >= 0 && X < N && Y >= 0 && Y < N && dx*dx + dy*dy <= r*r + 1) o[Y * N + X] = 1;
     }
+  return o;
+}
+function distMap(g) { // 一番近い線までの距離
+  const INF = 1e9, d = new Float64Array(N * N);
+  for (let i = 0; i < N * N; i++) d[i] = g[i] ? 0 : INF;
+  const D = Math.SQRT2;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x;
+    if (x > 0) d[i] = Math.min(d[i], d[i-1] + 1);
+    if (y > 0) { d[i] = Math.min(d[i], d[i-N] + 1); if (x > 0) d[i] = Math.min(d[i], d[i-N-1] + D); if (x < N-1) d[i] = Math.min(d[i], d[i-N+1] + D); } }
+  for (let y = N - 1; y >= 0; y--) for (let x = N - 1; x >= 0; x--) { const i = y * N + x;
+    if (x < N-1) d[i] = Math.min(d[i], d[i+1] + 1);
+    if (y < N-1) { d[i] = Math.min(d[i], d[i+N] + 1); if (x < N-1) d[i] = Math.min(d[i], d[i+N+1] + D); if (x > 0) d[i] = Math.min(d[i], d[i+N-1] + D); } }
+  return d;
+}
+function softCover(a, dm) { // a の点が相手の線にどれだけ近いか（0〜1）
+  let n = 0, s = 0;
+  for (let i = 0; i < a.length; i++) if (a[i]) { n++; s += Math.max(0, 1 - Math.max(0, dm[i] - 1) / 4); }
+  return n ? s / n : 0;
+}
+function cover(a, b) { let n = 0, m = 0; for (let i = 0; i < a.length; i++) if (a[i]) { n++; if (b[i]) m++; } return n ? m / n : 0; }
+function zones(g, k) {
+  const z = new Array(k * k).fill(0), c = N / k;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y * N + x]) z[Math.floor(y / c) * k + Math.floor(x / c)]++;
+  const s = z.reduce((a, b) => a + b, 0) || 1; return z.map(v => v / s);
+}
+function corr(a, b) {
+  const n = a.length; let ma = 0, mb = 0; for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n;
+  let num = 0, da = 0, db2 = 0;
+  for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; num += x*y; da += x*x; db2 += y*y; }
+  return da && db2 ? num / Math.sqrt(da * db2) : 0;
+}
+function glyphCanvas(ch) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 200;
+  const c = cv.getContext('2d');
+  c.font = "500 160px 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif";
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000';
+  c.fillText(ch, 100, 108);
+  return cv;
+}
+function strokesCanvas(st, size = 200) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  drawStrokes(cv.getContext('2d'), st, size, size * 0.045, '#000');
+  return cv;
+}
+function judgeChar(st, ch) {
+  if (!st.length) return 0;
+  const u = thin(toGrid(strokesCanvas(st))), t = thin(toGrid(glyphCanvas(ch)));
+  const P = softCover(u, distMap(t)), R = softCover(t, distMap(u));
+  const f = (P + R) ? 2 * P * R / (P + R) : 0;
+  const z = Math.max(0, corr(zones(u, 8), zones(t, 8)));
+  return 0.65 * f + 0.35 * z;
+}
+const OK_LINE = 0.78, MID_LINE = 0.58;
+const grade = s => s >= OK_LINE ? 'ok' : s >= MID_LINE ? 'mid' : 'ng';
 
-    // 各級の件数更新
-    function updateCounts() {
-      ['3級', '準2級', '2級'].forEach(lvl => {
-        const countEl = document.getElementById(`count-${lvl}`);
-        if (!db) {
-          if (countEl) countEl.textContent = memoryCards.filter(c => c.level === lvl).length;
-          return;
-        }
-        const tx = db.transaction("kanji_cards", "readonly");
-        const index = tx.objectStore("kanji_cards").index("level");
-        const req = index.count(IDBKeyRange.only(lvl));
-        req.onsuccess = () => {
-          if (countEl) countEl.textContent = req.result;
-        };
-      });
+// ===== 5. 手書きパッド =====
+const pad = $('pad'); let pctx, padSize = 0, cur = null;
+function sizePad() {
+  const r = pad.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  padSize = r.width;
+  pad.width = r.width * dpr; pad.height = r.height * dpr;
+  pctx = pad.getContext('2d'); pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  redrawPad();
+}
+// 線は 0〜1 の座標で保存（大きさに依存しない）
+function drawStrokes(c, st, size, width, color) {
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = width; c.strokeStyle = color;
+  st.forEach(s => {
+    c.beginPath();
+    s.forEach((p, i) => i ? c.lineTo(p[0] * size, p[1] * size) : c.moveTo(p[0] * size, p[1] * size));
+    if (s.length === 1) c.lineTo(s[0][0] * size + .1, s[0][1] * size);
+    c.stroke();
+  });
+}
+function redrawPad() {
+  if (!pctx) return;
+  pctx.clearRect(0, 0, padSize, padSize);
+  drawStrokes(pctx, strokes, padSize, padSize * 0.045, '#2d3748');
+  $('pad-hint').hidden = strokes.length > 0;
+}
+function pt(e) { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; }
+pad.addEventListener('pointerdown', e => { e.preventDefault(); pad.setPointerCapture(e.pointerId); cur = [pt(e)]; strokes.push(cur); redrawPad(); });
+pad.addEventListener('pointermove', e => { if (!cur) return; e.preventDefault(); cur.push(pt(e)); redrawPad(); });
+['pointerup', 'pointercancel'].forEach(t => pad.addEventListener(t, () => { cur = null; renderSlots(); }));
+window.addEventListener('resize', sizePad);
+
+function renderSlots() {
+  const card = cards[idx]; if (!card) return;
+  const box = $('slots'); box.innerHTML = '';
+  [...card.kanji].forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'slot' + (i === charIdx ? ' cur' : '');
+    const st = i === charIdx ? strokes : drawings[i];
+    if (st && st.length) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 104;
+      drawStrokes(cv.getContext('2d'), st, 104, 6, '#2d3748'); d.appendChild(cv);
+    } else d.textContent = i + 1;
+    d.onclick = () => { drawings[charIdx] = strokes; charIdx = i; strokes = drawings[i] || []; redrawPad(); renderSlots(); updateAskButtons(); };
+    box.appendChild(d);
+  });
+}
+function updateAskButtons() {
+  const card = cards[idx];
+  $('next-char').textContent = (card && charIdx >= [...card.kanji].length - 1) ? '答え合わせ' : '次の字';
+}
+
+// ===== 6. 画面表示 =====
+function showStat(card) {
+  const tag = { review: '要復習', mastered: '覚えた', unlearned: '未学習' }[card.status] || '未学習';
+  $('stat').textContent = `${tag}　◯${card.correct || 0} ×${card.wrong || 0}`;
+}
+function setView(v) {
+  $('write-ask').hidden = v !== 'ask';
+  $('write-result').hidden = v !== 'result';
+  $('see').hidden = v !== 'see';
+  $('ft-ask').hidden = v !== 'ask';
+  $('ft-result').hidden = v !== 'result';
+  $('ft-see').hidden = v !== 'see';
+}
+function showCard() {
+  clearInterval(timerId);
+  if (!cards.length) {
+    $('reading').textContent = 'データがありません';
+    setView('none'); $('counter').textContent = '0 / 0'; $('bar').style.width = '0';
+    return;
+  }
+  const card = cards[idx];
+  $('badge').textContent = card.level;
+  $('reading').textContent = card.reading;
+  $('counter').textContent = `${idx + 1} / ${cards.length}`;
+  $('bar').style.width = ((idx + 1) / cards.length * 100) + '%';
+  showStat(card);
+  if (audioOn) speak(card.reading);
+
+  if (mode === 'write') {
+    charIdx = 0; drawings = []; strokes = [];
+    setView('ask'); sizePad(); redrawPad(); renderSlots(); updateAskButtons();
+  } else {
+    setView('see');
+    $('flash-kanji').textContent = card.kanji; $('flash-kanji').classList.remove('show');
+    $('meaning-s').textContent = card.meaning; $('meaning-s').classList.remove('show');
+    startTimer();
+  }
+}
+
+function judgeAll() {
+  drawings[charIdx] = strokes;
+  const card = cards[idx], chars = [...card.kanji];
+  const scores = chars.map((ch, i) => judgeChar(drawings[i] || [], ch));
+  const grades = scores.map(grade);
+  const allOk = grades.every(g => g === 'ok'), anyNg = grades.includes('ng');
+  const overall = allOk ? 'ok' : anyNg ? 'ng' : 'mid';
+  lastResult = { card, overall };
+
+  $('verdict').className = 'verdict ' + overall;
+  $('verdict').textContent = { ok: '◯ 正解', mid: '△ おしい？ 自分で確認', ng: '× まちがい' }[overall];
+  $('answer').textContent = card.kanji;
+  $('meaning-w').textContent = card.meaning;
+  const res = $('results'); res.innerHTML = '';
+  chars.forEach((ch, i) => {
+    const w = document.createElement('div'); w.className = 'res';
+    const b = document.createElement('div'); b.className = 'res-box';
+    const a = document.createElement('div'); a.className = 'ans'; a.textContent = ch; b.appendChild(a);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 156;
+    drawStrokes(cv.getContext('2d'), drawings[i] || [], 156, 8, '#2d3748'); b.appendChild(cv);
+    const m = document.createElement('div'); m.className = 'res-mark ' + grades[i];
+    m.textContent = { ok: '◯', mid: '△', ng: '×' }[grades[i]] + ' ' + Math.round(scores[i] * 100) + '点';
+    w.append(b, m); res.appendChild(w);
+  });
+  record(card, overall === 'ok');
+  $('override').hidden = overall === 'ok';
+  setView('result');
+}
+
+// 見るモードのタイマー
+function startTimer() {
+  const ring = $('ring');
+  ring.style.transition = 'none'; ring.style.strokeDashoffset = '0'; $('sec').textContent = '2s';
+  requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.transition = 'stroke-dashoffset 2s linear'; ring.style.strokeDashoffset = '126'; }));
+  let left = 2;
+  timerId = setInterval(() => {
+    left--; $('sec').textContent = left + 's';
+    if (left <= 0) { clearInterval(timerId); $('flash-kanji').classList.add('show'); $('meaning-s').classList.add('show'); }
+  }, 1000);
+}
+
+function nextCard() { if (!cards.length) return; idx = (idx + 1) % cards.length; if (idx === 0) cards = orderCards(cards); showCard(); }
+
+// ===== 7. 音声 =====
+function speak(t) {
+  if (!('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .9; speechSynthesis.speak(u); } catch (e) {}
+}
+
+// ===== 8. ボタン =====
+$('undo').onclick = () => { strokes.pop(); redrawPad(); renderSlots(); };
+$('clear').onclick = () => { strokes = []; redrawPad(); renderSlots(); };
+$('next-char').onclick = () => {
+  const n = [...cards[idx].kanji].length;
+  if (charIdx < n - 1) { drawings[charIdx] = strokes; charIdx++; strokes = drawings[charIdx] || []; redrawPad(); renderSlots(); updateAskButtons(); }
+  else judgeAll();
+};
+$('override').onclick = () => {
+  const c = lastResult.card; c.wrong = Math.max(0, (c.wrong || 1) - 1);
+  record(c, true);
+  $('verdict').className = 'verdict ok'; $('verdict').textContent = '◯ 正解（自分で判定）';
+  $('override').hidden = true;
+};
+$('next-q').onclick = nextCard;
+$('see-next').onclick = nextCard;
+$('mark-review').onclick = () => { if (cards[idx]) { record(cards[idx], false); nextCard(); } };
+$('mark-ok').onclick = () => { if (cards[idx]) { record(cards[idx], true); nextCard(); } };
+$('speak').onclick = () => cards[idx] && speak(cards[idx].reading);
+$('audio-toggle').onclick = () => {
+  audioOn = !audioOn;
+  $('audio-toggle').textContent = audioOn ? '🔊' : '🔇';
+  $('audio-toggle').classList.toggle('muted', !audioOn);
+  if (!audioOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+};
+function setMode(m) {
+  mode = m;
+  $('mode-write').classList.toggle('on', m === 'write');
+  $('mode-see').classList.toggle('on', m === 'see');
+  showCard();
+}
+$('mode-write').onclick = () => setMode('write');
+$('mode-see').onclick = () => setMode('see');
+document.querySelectorAll('nav.levels button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav.levels button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); loadLevel(b.dataset.level);
+});
+
+// データ追加（JSON配列、または「級,漢字,読み,意味」のCSV）
+$('file-input').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    let list = [];
+    try {
+      const text = String(r.result).replace(/^\uFEFF/, '');
+      if (f.name.toLowerCase().endsWith('.csv')) {
+        list = text.split(/\r?\n/).map(l => l.split(',')).filter(c => c.length >= 3 && c[1] && c[1] !== '漢字')
+          .map(c => ({ level: c[0].trim(), kanji: c[1].trim(), reading: c[2].trim(), meaning: (c.slice(3).join(',') || '').trim() }));
+      } else list = JSON.parse(text);
+      if (!Array.isArray(list) || !list.length) throw new Error();
+    } catch (err) { alert('読み込めませんでした。JSON配列か「級,漢字,読み,意味」のCSVにしてください。'); return; }
+    const rows = list.map(it => ({ ...it, status: 'unlearned', correct: 0, wrong: 0 }));
+    if (!db) {
+      rows.forEach(it => memoryCards.push({ ...it, id: memoryCards.length + 1 }));
+      alert(rows.length + '件を追加しました（このページを閉じると消えます）');
+      updateCounts(); loadLevel(currentLevel); return;
     }
+    const tx = db.transaction('kanji_cards', 'readwrite'), s = tx.objectStore('kanji_cards');
+    rows.forEach(it => s.add(it));
+    tx.oncomplete = () => { alert(rows.length + '件を追加しました'); updateCounts(); loadLevel(currentLevel); };
+  };
+  r.readAsText(f);
+  e.target.value = '';
+};
 
-    // 指定した級のカードを読み込み
-    function loadLevelCards(level) {
-      currentLevel = level;
-      if (!db) {
-        currentCards = memoryCards.filter(c => c.level === level);
-        currentIndex = 0;
-        showCard();
-        return;
-      }
-      const tx = db.transaction("kanji_cards", "readonly");
-      const index = tx.objectStore("kanji_cards").index("level");
-      const req = index.getAll(IDBKeyRange.only(level));
-
-      req.onsuccess = () => {
-        currentCards = req.result;
-        currentIndex = 0;
-        showCard();
-      };
-    }
-
-    // 4. カード表示 & 2秒タイマー制御
-    function showCard() {
-      if (timerId) clearInterval(timerId);
-
-      if (currentCards.length === 0) {
-        readingEl.textContent = 'データなし';
-        kanjiEl.textContent = '-';
-        meaningEl.textContent = 'データが登録されていません';
-        return;
-      }
-
-      const card = currentCards[currentIndex];
-      badgeEl.textContent = card.level;
-      readingEl.textContent = card.reading;
-      kanjiEl.textContent = card.kanji;
-      meaningEl.textContent = card.meaning;
-
-      // リセット
-      kanjiEl.classList.remove('revealed');
-      meaningEl.classList.remove('revealed');
-      
-      // プログレス
-      const progressPercent = ((currentIndex + 1) / currentCards.length) * 100;
-      progressFill.style.width = `${progressPercent}%`;
-      progressCounter.textContent = `${currentIndex + 1} / ${currentCards.length}`;
-
-      // 音声読み上げ（ON時）
-      if (isAudioEnabled) speakText(card.reading);
-
-      // 2秒タイマーの開始
-      start2SecTimer();
-    }
-
-    function start2SecTimer() {
-      timerProgress.style.transition = 'none';
-      timerProgress.style.strokeDashoffset = '0';
-      timerSecEl.textContent = '2s';
-
-      setTimeout(() => {
-        timerProgress.style.transition = 'stroke-dashoffset 2s linear';
-        timerProgress.style.strokeDashoffset = '126';
-      }, 50);
-
-      let remaining = 2;
-      timerId = setInterval(() => {
-        remaining--;
-        if (remaining <= 0) {
-          clearInterval(timerId);
-          timerSecEl.textContent = '0s';
-          revealKanji();
-        } else {
-          timerSecEl.textContent = remaining + 's';
-        }
-      }, 1000);
-    }
-
-    function revealKanji() {
-      kanjiEl.classList.add('revealed');
-      meaningEl.classList.add('revealed');
-    }
-
-    // 5. 音声合成 (Web Speech API)
-    function speakText(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const uttr = new SpeechSynthesisUtterance(text);
-        uttr.lang = 'ja-JP';
-        uttr.rate = 0.9;
-        try { window.speechSynthesis.speak(uttr); } catch (err) {}
-      }
-    }
-
-    // 6. イベントリスナーの設定
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-        loadLevelCards(e.currentTarget.dataset.level);
-      });
-    });
-
-    document.getElementById('btn-next').addEventListener('click', () => {
-      if (currentCards.length === 0) return;
-      currentIndex = (currentIndex + 1) % currentCards.length;
-      showCard();
-    });
-
-    document.getElementById('speech-btn').addEventListener('click', () => {
-      if (currentCards.length > 0) speakText(currentCards[currentIndex].reading);
-    });
-
-    // 音声 ON/OFF トグル
-    audioToggleBtn.addEventListener('click', () => {
-      isAudioEnabled = !isAudioEnabled;
-      if (isAudioEnabled) {
-        audioIcon.textContent = '🔊';
-        audioText.textContent = '音声 ON';
-        audioToggleBtn.classList.remove('muted');
-      } else {
-        audioIcon.textContent = '🔇';
-        audioText.textContent = 'マナー';
-        audioToggleBtn.classList.add('muted');
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      }
-    });
-
-    // 外部JSON/CSV一括インポート機能
-    document.getElementById('csv-file-input').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = JSON.parse(event.target.result);
-          if (Array.isArray(data) && !db) {
-            data.forEach(item => memoryCards.push({ ...item, id: memoryCards.length + 1, status: 'unlearned' }));
-            alert('データを追加しました（このページを閉じると消えます）');
-            updateCounts();
-            loadLevelCards(currentLevel);
-          } else if (Array.isArray(data)) {
-            const tx = db.transaction("kanji_cards", "readwrite");
-            const store = tx.objectStore("kanji_cards");
-            data.forEach(item => store.add({ ...item, status: 'unlearned' }));
-            tx.oncomplete = () => {
-              alert('データを正常に追加登録しました！');
-              updateCounts();
-              loadLevelCards(currentLevel);
-            };
-          }
-        } catch (err) {
-          alert('JSONファイルのフォーマットを確認してください。');
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    // 起動
-    window.addEventListener('error', (e) => setStatus('エラー: ' + e.message));
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', initIndexedDB);
-    } else {
-      initIndexedDB();
-    }
-  </script>
+// ===== 9. 起動 =====
+window.addEventListener('error', e => setStatus('エラー：' + e.message));
+const boot = () => { (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {}); initDB(); };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+</script>
 </body>
 </html>
