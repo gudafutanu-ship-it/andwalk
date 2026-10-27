@@ -128,6 +128,7 @@
   .data { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 10px; font-size: .7rem; color: var(--sub); gap: 8px; }
   .data label { background: #edf2f7; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-weight: 700; white-space: nowrap; }
   .data input { display: none; }
+  .data select { font: inherit; font-size: .7rem; font-weight: 700; color: var(--sub); background: #edf2f7; border: none; border-radius: 8px; padding: 4px 6px; }
   [hidden] { display: none !important; }
   button:focus-visible, label:focus-within { outline: 3px solid #f6ad55; outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -203,27 +204,513 @@
 
   <div class="data">
     <span>DB状態：<strong id="db-status">接続中</strong></span>
+    <select id="strict" aria-label="判定のきびしさ">
+      <option value="easy">判定：やさしい</option>
+      <option value="normal">判定：ふつう</option>
+      <option value="hard">判定：きびしい</option>
+    </select>
     <label>データ追加<input type="file" id="file-input" accept=".json,.csv"></label>
   </div>
 </div>
 
 <script>
 // ===== 1. 内蔵データ =====
-const initialDataset = [
-  { level: '3級', kanji: '分裂', reading: 'ぶんれつ', meaning: '一つだったものがいくつかに分かれること。' },
-  { level: '3級', kanji: '丁寧', reading: 'ていねい', meaning: '細かいところまで注意が行き届いていること。' },
-  { level: '3級', kanji: '義務', reading: 'ぎむ', meaning: '立場上、当然しなければならないこと。' },
-  { level: '3級', kanji: '絶望', reading: 'ぜつぼう', meaning: 'すべての希望を失ってしまうこと。' },
-  { level: '3級', kanji: '観察', reading: 'かんさつ', meaning: '物事の様子を注意深く見ること。' },
-  { level: '準2級', kanji: '摩擦', reading: 'まさつ', meaning: '物と物とがすり合わさること。意見の衝突。' },
-  { level: '準2級', kanji: '矛盾', reading: 'むじゅん', meaning: '二つの主張がつじつまの合わないこと。' },
-  { level: '準2級', kanji: '隠蔽', reading: 'いんぺい', meaning: '覆い隠して人の目に触れさせないこと。' },
-  { level: '準2級', kanji: '顕著', reading: 'けんちょ', meaning: '際立って目立つさま。' },
-  { level: '2級', kanji: '網羅', reading: 'もうら', meaning: '残らず集めて包み入れること。' },
-  { level: '2級', kanji: '脆弱', reading: 'ぜいじゃく', meaning: 'もろくて弱いこと。' },
-  { level: '2級', kanji: '躊躇', reading: 'ちゅうちょ', meaning: 'ためらうこと。決断できずに迷うこと。' },
-  { level: '2級', kanji: '破綻', reading: 'はたん', meaning: '物事が破れてうまくいかなくなること。' }
-];
+const BUILTIN = {
+'3級': `握手|あくしゅ|手を握り合うこと。
+依頼|いらい|人に用事を頼むこと。
+偉大|いだい|非常にすぐれて立派なこと。
+違反|いはん|規則や約束にそむくこと。
+維持|いじ|同じ状態を保ち続けること。
+陰影|いんえい|光の当たらない暗い部分。
+鋭利|えいり|刃物などが鋭くよく切れること。
+援助|えんじょ|困っている人を助けること。
+縁側|えんがわ|和室の外側に設けた細長い板敷き。
+汚染|おせん|有害な物質などで汚れること。
+記憶|きおく|物事を覚えておくこと。
+休暇|きゅうか|仕事や学校を休むこと。
+優雅|ゆうが|上品でみやびやかなこと。
+警戒|けいかい|危険に備えて用心すること。
+破壊|はかい|打ち壊すこと。
+比較|ひかく|比べ合わせること。
+獲得|かくとく|努力して手に入れること。
+甘味|かんみ|あまい味。
+乾燥|かんそう|水分がなくなってかわくこと。
+歓迎|かんげい|喜んで迎えること。
+環境|かんきょう|周りを取り巻く状況。
+奇妙|きみょう|普通と違って不思議なこと。
+祈願|きがん|神仏に願い事をすること。
+儀式|ぎしき|決まった作法で行う行事。
+脚本|きゃくほん|劇や映画のせりふや動きを書いたもの。
+砂丘|さきゅう|風で運ばれた砂でできた丘。
+巨大|きょだい|非常に大きいこと。
+根拠|こんきょ|考えや意見のよりどころ。
+距離|きょり|二つの地点の隔たり。
+絶叫|ぜっきょう|ありったけの声で叫ぶこと。
+状況|じょうきょう|その時の様子。
+恐怖|きょうふ|おそれること。
+影響|えいきょう|他に作用を及ぼすこと。
+驚異|きょうい|驚くほど不思議なこと。
+信仰|しんこう|神仏などを信じあがめること。
+屈折|くっせつ|折れ曲がること。
+発掘|はっくつ|土の中から掘り出すこと。
+恩恵|おんけい|利益や幸福をもたらすもの。
+傾向|けいこう|物事がある方向へかたむくこと。
+継続|けいぞく|続けること。
+攻撃|こうげき|相手を攻めること。
+兼業|けんぎょう|本業以外の仕事をもつこと。
+真剣|しんけん|本気で物事に取り組むこと。
+堅実|けんじつ|手堅く確実なこと。
+派遣|はけん|任務を与えて行かせること。
+誇張|こちょう|大げさに言うこと。
+鼓動|こどう|心臓が脈打つこと。
+相互|そうご|たがいに。
+抵抗|ていこう|外からの力に逆らうこと。
+恒例|こうれい|決まって行われること。
+荒野|こうや|荒れ果てた野原。
+香水|こうすい|体などにつける香りのよい液体。
+原稿|げんこう|印刷などのもとになる文章。
+豪華|ごうか|ぜいたくで派手なこと。
+結婚|けっこん|夫婦になること。
+連鎖|れんさ|鎖のようにつながること。
+色彩|しきさい|いろどり。
+記載|きさい|書類などに書いて載せること。
+悲惨|ひさん|見ていられないほど痛ましいこと。
+要旨|ようし|話や文章の主な内容。
+名刺|めいし|名前などを印刷した小さな紙。
+執筆|しっぴつ|文章を書くこと。
+解釈|かいしゃく|意味を理解し説明すること。
+趣味|しゅみ|楽しみとして好むこと。
+需要|じゅよう|求められること。
+優秀|ゆうしゅう|非常にすぐれていること。
+柔道|じゅうどう|日本で生まれた武道の一つ。
+瞬間|しゅんかん|ほんのわずかな時間。
+矛盾|むじゅん|二つの事のつじつまが合わないこと。
+紹介|しょうかい|知らない人どうしを引き合わせること。
+詳細|しょうさい|くわしいこと。
+繁殖|はんしょく|生物が生まれて増えること。
+装飾|そうしょく|美しく飾ること。
+接触|せっしょく|触れること。
+侵入|しんにゅう|無理に入り込むこと。
+振動|しんどう|ゆれ動くこと。
+慎重|しんちょう|注意深く行うこと。
+地震|じしん|大地がゆれ動くこと。
+尋問|じんもん|問いただすこと。
+追跡|ついせき|あとを追うこと。
+独占|どくせん|ひとり占めすること。
+新鮮|しんせん|新しく生き生きしていること。
+騒音|そうおん|うるさい音。
+贈答|ぞうとう|品物を贈ったりお返ししたりすること。
+即座|そくざ|その場ですぐ。
+耐久|たいきゅう|長くもちこたえること。
+開拓|かいたく|荒れ地を切り開くこと。
+脱出|だっしゅつ|抜け出すこと。
+冷淡|れいたん|思いやりがなく冷たいこと。
+極端|きょくたん|非常にかたよっていること。
+遅刻|ちこく|決められた時刻に遅れること。
+貯蓄|ちょちく|お金をたくわえること。
+象徴|しょうちょう|形のないものを具体的な物で表すこと。
+沈黙|ちんもく|だまりこむこと。
+珍味|ちんみ|めったに味わえない珍しい食べ物。
+指摘|してき|具体的に取り上げて示すこと。
+途中|とちゅう|目的地に着くまでの間。
+逃走|とうそう|逃げ去ること。
+浸透|しんとう|しみ通ること。
+戦闘|せんとう|戦うこと。
+突然|とつぜん|急に。
+濃厚|のうこう|色や味がこいこと。
+迫力|はくりょく|人の心に強く迫る力。
+爆発|ばくはつ|急激に破裂すること。
+頭髪|とうはつ|頭の毛。
+一般|いっぱん|広く全体に共通すること。
+販売|はんばい|品物を売ること。
+範囲|はんい|一定の限られた広がり。
+疲労|ひろう|つかれること。
+被害|ひがい|損害を受けること。
+避難|ひなん|災難を避けて安全な所へ移ること。
+微妙|びみょう|細かく複雑で言い表しにくいこと。
+描写|びょうしゃ|ありさまを描き表すこと。
+普通|ふつう|一般的でありふれていること。
+皮膚|ひふ|体の表面をおおう皮。
+舞台|ぶたい|演技をする場所。
+噴火|ふんか|火山が溶岩などを噴き出すこと。
+捕獲|ほかく|動物などをとらえること。
+冒険|ぼうけん|危険をおかして行うこと。
+平凡|へいぼん|ありふれていること。
+我慢|がまん|耐え忍ぶこと。
+冬眠|とうみん|冬の間、眠った状態で過ごすこと。
+濃霧|のうむ|深い霧。
+勇猛|ゆうもう|勇ましく強いこと。
+活躍|かつやく|目覚ましく活動すること。
+英雄|えいゆう|才知や武勇にすぐれた人。
+名誉|めいよ|ほまれ。
+信頼|しんらい|信じて頼ること。
+分離|ぶんり|分かれ離れること。
+配慮|はいりょ|心をくばること。
+治療|ちりょう|病気やけがを治すこと。
+年齢|ねんれい|生まれてからの年数。
+華麗|かれい|華やかで美しいこと。
+劣化|れっか|品質や性能が低下すること。
+強烈|きょうれつ|強く激しいこと。
+恋愛|れんあい|恋い慕うこと。
+露天|ろてん|屋根のない所。
+迷惑|めいわく|他人に不快な思いをさせること。
+腕力|わんりょく|腕の力。
+普及|ふきゅう|広く行き渡ること。
+抱負|ほうふ|心の中に持つ計画や決意。`,
+'準2級': `摩擦|まさつ|物と物とがすり合わさること。意見の衝突。
+網羅|もうら|残らず集めて取り入れること。
+顕著|けんちょ|際立って目立つさま。
+逸話|いつわ|世に知られていない興味深い話。
+婚姻|こんいん|結婚すること。
+余韻|よいん|事が終わった後に残る味わい。
+免疫|めんえき|病気への抵抗力を持つこと。
+凹凸|おうとつ|でこぼこ。
+渦中|かちゅう|もめごとの中心。
+災禍|さいか|災いによる被害。
+稼働|かどう|機械などが動いて働くこと。
+誘拐|ゆうかい|人をだまして連れ去ること。
+懐古|かいこ|昔をなつかしく思うこと。
+生涯|しょうがい|生きている間。
+中核|ちゅうかく|物事の中心となる大事な部分。
+地殻|ちかく|地球の表面をおおう層。
+包括|ほうかつ|ひっくるめること。
+恐喝|きょうかつ|おどして金品を奪うこと。
+渇望|かつぼう|心から強く望むこと。
+欠陥|けっかん|不備な点。
+患者|かんじゃ|病気やけがの治療を受ける人。
+堪能|たんのう|十分に満足すること。
+寛大|かんだい|心が広く思いやりがあること。
+返還|へんかん|元の持ち主に返すこと。
+艦隊|かんたい|軍艦の集団。
+頑固|がんこ|考えをかたくなに変えないこと。
+企画|きかく|計画を立てること。
+分岐|ぶんき|道などが分かれること。
+禁忌|きんき|避けて禁じること。
+軌道|きどう|物体が通る道筋。
+既存|きそん|既に存在すること。
+放棄|ほうき|投げ捨てること。権利を捨てること。
+犠牲|ぎせい|目的のために大切なものを捧げること。
+喫茶|きっさ|茶を飲むこと。
+虐待|ぎゃくたい|ひどい扱いをすること。
+虚偽|きょぎ|うそ。
+海峡|かいきょう|陸にはさまれた狭い海。
+脅威|きょうい|おびやかされるような強い力。
+凝視|ぎょうし|じっと見つめること。
+緊張|きんちょう|心や体が張りつめること。
+愚問|ぐもん|つまらない質問。
+偶然|ぐうぜん|思いがけないこと。
+遭遇|そうぐう|思いがけず出会うこと。
+契約|けいやく|約束を取り交わすこと。
+啓発|けいはつ|気づかせて理解を深めさせること。
+掲示|けいじ|人目につく所に示すこと。
+携帯|けいたい|身につけて持つこと。
+休憩|きゅうけい|一休みすること。
+賢明|けんめい|かしこく適切なこと。
+幻想|げんそう|現実にない事を思い描くこと。
+孤独|こどく|ひとりぼっち。
+雇用|こよう|人をやとうこと。
+回顧|かいこ|過去を振り返ること。
+娯楽|ごらく|楽しみごと。
+覚悟|かくご|心構えをすること。
+技巧|ぎこう|技術上の工夫。
+拘束|こうそく|自由を奪うこと。
+郊外|こうがい|都市の周辺地域。
+控除|こうじょ|差し引くこと。
+恐慌|きょうこう|恐れあわてること。経済の大混乱。
+硬貨|こうか|金属のお金。
+発酵|はっこう|微生物が物質を変化させること。
+克服|こくふく|困難に打ち勝つこと。
+地獄|じごく|悪人が死後に落ちるとされる世界。
+痛恨|つうこん|ひどく残念に思うこと。
+開墾|かいこん|荒れ地を耕して田畑にすること。
+負債|ふさい|借金。
+催促|さいそく|早くするよう求めること。
+削除|さくじょ|削り取ること。
+錯覚|さっかく|思い違い。
+撮影|さつえい|写真や映画をとること。
+暫定|ざんてい|一時的に定めること。
+福祉|ふくし|人々の幸福。
+施設|しせつ|ある目的のための建物や設備。
+慈善|じぜん|困っている人を助けること。
+疾走|しっそう|非常に速く走ること。
+湿度|しつど|空気中の水分の割合。
+邪魔|じゃま|さまたげになること。
+特殊|とくしゅ|普通と違うこと。
+長寿|ちょうじゅ|長生き。
+潤滑|じゅんかつ|なめらかに動くこと。
+徐行|じょこう|ゆっくり進むこと。
+巨匠|きょしょう|その道で特にすぐれた人。
+昇進|しょうしん|地位が上がること。
+結晶|けっしょう|規則正しい形に固まったもの。努力の成果。
+焦点|しょうてん|注目が集まる所。
+衝突|しょうとつ|ぶつかること。
+警鐘|けいしょう|危険を知らせる合図。
+冗談|じょうだん|ふざけた話。
+錠剤|じょうざい|粒状に固めた薬。
+譲歩|じょうほ|自分の主張を控え相手に従うこと。
+委嘱|いしょく|仕事を人にまかせ頼むこと。
+屈辱|くつじょく|恥をかかされること。
+審判|しんぱん|判定すること。
+自炊|じすい|自分で食事を作ること。
+純粋|じゅんすい|まじりけのないこと。
+衰退|すいたい|勢いが衰えること。
+麻酔|ますい|薬で感覚を失わせること。
+完遂|かんすい|最後までやりとげること。
+随筆|ずいひつ|思いのままに書いた文章。
+骨髄|こつずい|骨の中心部の組織。
+拒絶|きょぜつ|断ること。
+請求|せいきゅう|要求すること。
+排斥|はいせき|退けること。
+惜敗|せきはい|わずかの差で負けること。
+書籍|しょせき|本。
+摂取|せっしゅ|取り入れること。
+潜水|せんすい|水中にもぐること。
+修繕|しゅうぜん|修理すること。
+阻止|そし|くいとめること。
+措置|そち|取り計らって始末をつけること。
+粗末|そまつ|質が悪いこと。
+基礎|きそ|土台。
+双方|そうほう|両方。
+清掃|せいそう|掃除すること。
+埋葬|まいそう|遺体を土に埋めて葬ること。
+憎悪|ぞうお|憎むこと。
+怠慢|たいまん|なまけること。
+胎児|たいじ|母親の体内の子。
+逮捕|たいほ|犯人などをとらえること。
+停滞|ていたい|物事が進まないこと。
+選択|せんたく|選ぶこと。
+卓越|たくえつ|群を抜いてすぐれていること。
+委託|いたく|他人にまかせること。
+承諾|しょうだく|引き受けること。
+奪取|だっしゅ|奪い取ること。
+大胆|だいたん|度胸があること。
+鍛錬|たんれん|きたえること。
+花壇|かだん|花を植える区画。
+幼稚|ようち|幼いこと。
+抽象|ちゅうしょう|共通の性質を抜き出してとらえること。
+駐車|ちゅうしゃ|車をとめておくこと。
+彫刻|ちょうこく|木や石などを刻んで形を作ること。
+挑戦|ちょうせん|困難に立ち向かうこと。
+超越|ちょうえつ|程度をはるかに超えること。
+聴衆|ちょうしゅう|話や演奏を聞く人々。
+陳列|ちんれつ|並べて見せること。
+鎮静|ちんせい|落ち着いてしずまること。
+墜落|ついらく|高い所から落ちること。
+訂正|ていせい|誤りを正すこと。
+締結|ていけつ|条約などを結ぶこと。
+哲学|てつがく|物事の根本を考える学問。
+冷凍|れいとう|凍らせること。
+陶器|とうき|焼き物。
+匿名|とくめい|名前を隠すこと。
+粘土|ねんど|ねばりのある土。
+排除|はいじょ|取り除くこと。
+束縛|そくばく|自由を制限すること。
+伐採|ばっさい|木を切り出すこと。
+同伴|どうはん|連れ立って行くこと。
+野蛮|やばん|文化が開けていないこと。乱暴なこと。
+卑屈|ひくつ|いじけて自信がないこと。
+石碑|せきひ|文字を刻んで建てた石。
+漂流|ひょうりゅう|海などを漂い流れること。
+種苗|しゅびょう|植物の種と苗。
+赴任|ふにん|任地へ行くこと。
+符号|ふごう|しるし。記号。
+封筒|ふうとう|手紙を入れる袋。
+潜伏|せんぷく|ひそみ隠れること。
+転覆|てんぷく|ひっくり返ること。
+紛失|ふんしつ|なくすこと。
+古墳|こふん|古代の墓。
+募集|ぼしゅう|広く集めること。
+名簿|めいぼ|名前を書き並べた帳簿。
+芳香|ほうこう|よい香り。
+奉仕|ほうし|他人のために尽くすこと。
+細胞|さいぼう|生物の体を作る単位。
+模倣|もほう|まねること。
+崩壊|ほうかい|くずれこわれること。
+飽和|ほうわ|限度いっぱいまで満たされること。
+裁縫|さいほう|布を縫うこと。
+欠乏|けつぼう|不足すること。
+妨害|ぼうがい|じゃまをすること。
+膨張|ぼうちょう|ふくれ上がること。
+陰謀|いんぼう|ひそかなたくらみ。
+翻訳|ほんやく|他の言語に訳すこと。
+埋没|まいぼつ|うずもれること。
+魅力|みりょく|人を引きつける力。
+消滅|しょうめつ|消えてなくなること。
+誘導|ゆうどう|導くこと。
+憂慮|ゆうりょ|心配すること。
+抑揚|よくよう|声の調子の上げ下げ。
+動揺|どうよう|揺れ動くこと。心が乱れること。
+擁護|ようご|かばい守ること。
+抑制|よくせい|おさえとどめること。
+隆起|りゅうき|高く盛り上がること。
+完了|かんりょう|終わること。
+狩猟|しゅりょう|狩りをすること。
+食糧|しょくりょう|主食となる食べ物。
+激励|げきれい|励まし奮い立たせること。
+零下|れいか|氷点下。
+幽霊|ゆうれい|死者の霊。
+決裂|けつれつ|交渉がまとまらず物別れになること。
+清廉|せいれん|心が清く私欲がないこと。
+暖炉|だんろ|部屋を暖める炉。
+浪費|ろうひ|むだづかい。
+廊下|ろうか|部屋をつなぐ細長い通路。
+漏電|ろうでん|電気が漏れること。
+港湾|こうわん|港。`,
+'2級': `挨拶|あいさつ|人に会ったときなどに交わす言葉や動作。
+曖昧|あいまい|はっきりしないこと。
+畏怖|いふ|恐れおののくこと。
+萎縮|いしゅく|縮こまって元気がなくなること。
+語彙|ごい|ある範囲で使われる言葉の全体。
+咽喉|いんこう|のど。
+憂鬱|ゆううつ|気分が晴れないこと。
+怨念|おんねん|深いうらみの心。
+妖艶|ようえん|あやしいほど美しいこと。
+旺盛|おうせい|活力が盛んなこと。
+臆病|おくびょう|怖がりなこと。
+苛酷|かこく|厳しくむごいこと。
+象牙|ぞうげ|象のきば。
+瓦解|がかい|組織などが一気に崩れること。
+楷書|かいしょ|崩さずに書く書体。
+潰瘍|かいよう|皮膚や粘膜がただれること。
+俳諧|はいかい|俳句などのもとになった文芸。
+断崖|だんがい|切り立った崖。
+頭蓋|ずがい|頭の骨。
+残骸|ざんがい|壊れて残ったもの。
+玩具|がんぐ|おもちゃ。
+歌舞伎|かぶき|日本の伝統的な演劇。
+毀損|きそん|傷つけること。名誉などを損なうこと。
+近畿|きんき|関西を中心とする地方。
+脱臼|だっきゅう|関節が外れること。
+嗅覚|きゅうかく|においを感じる感覚。
+雑巾|ぞうきん|掃除用の布。
+僅差|きんさ|わずかな差。
+錦絵|にしきえ|多色刷りの浮世絵。
+危惧|きぐ|あやぶみ恐れること。
+洞窟|どうくつ|ほら穴。
+参詣|さんけい|社寺にお参りすること。
+稽古|けいこ|芸事などを練習すること。
+間隙|かんげき|すきま。
+拳銃|けんじゅう|ピストル。
+鍵盤|けんばん|ピアノなどのキーの並び。
+舷側|げんそく|船の側面。
+虎穴|こけつ|虎のすむ穴。危険な場所。
+禁錮|きんこ|刑務所に拘置する刑。
+勾配|こうばい|傾きの度合い。
+喉元|のどもと|のどのあたり。
+傲慢|ごうまん|おごって人を見下すこと。
+痕跡|こんせき|何かがあった跡。
+沙汰|さた|知らせ。事件。
+挫折|ざせつ|途中でくじけること。
+喝采|かっさい|盛んにほめること。
+閉塞|へいそく|閉ざされふさがること。
+鉄柵|てっさく|鉄のさく。
+刹那|せつな|非常に短い時間。
+斬新|ざんしん|新しくて独創的なこと。
+恣意|しい|気ままな考え。
+真摯|しんし|まじめでひたむきなこと。
+叱責|しっせき|しかりとがめること。
+嫉妬|しっと|ねたむこと。
+腫瘍|しゅよう|組織の異常な増殖によるこぶ。
+呪文|じゅもん|まじないの言葉。
+領袖|りょうしゅう|集団のかしら。
+羞恥|しゅうち|恥ずかしく思うこと。
+一蹴|いっしゅう|はねつけること。
+憧憬|しょうけい|あこがれ。
+払拭|ふっしょく|ぬぐい去ること。
+必須|ひっす|必ず要ること。
+凄惨|せいさん|むごたらしいこと。
+覚醒|かくせい|目覚めること。
+脊髄|せきずい|背骨の中を通る神経。
+親戚|しんせき|親類。
+煎茶|せんちゃ|煎じて飲む緑茶。
+羨望|せんぼう|うらやむこと。
+涙腺|るいせん|涙を出す器官。
+所詮|しょせん|結局。
+便箋|びんせん|手紙を書く紙。
+配膳|はいぜん|料理を並べること。
+狙撃|そげき|ねらって撃つこと。
+遡及|そきゅう|さかのぼって及ぶこと。
+爽快|そうかい|さわやかで気持ちよいこと。
+痩身|そうしん|やせた体。
+失踪|しっそう|行方をくらますこと。
+捕捉|ほそく|とらえること。
+謙遜|けんそん|へりくだること。
+唾液|だえき|つば。
+堆積|たいせき|積み重なること。
+頂戴|ちょうだい|もらうこと。
+元旦|がんたん|元日の朝。
+破綻|はたん|物事がうまくいかなくなること。
+精緻|せいち|細かく精密なこと。
+焼酎|しょうちゅう|蒸留酒の一つ。
+嘲笑|ちょうしょう|あざけり笑うこと。
+進捗|しんちょく|物事がはかどること。
+脊椎|せきつい|背骨。
+千羽鶴|せんばづる|折り鶴をたくさんつないだもの。
+諦観|ていかん|本質を見きわめること。あきらめること。
+溺愛|できあい|むやみにかわいがること。
+装塡|そうてん|弾などを詰めること。
+賭博|とばく|かけごと。
+葛藤|かっとう|心の中で迷い争うこと。
+瞳孔|どうこう|ひとみ。
+頓挫|とんざ|途中で行き詰まること。
+貪欲|どんよく|欲が深いこと。
+土鍋|どなべ|土で作った鍋。
+虹彩|こうさい|ひとみの周りの膜。
+捻出|ねんしゅつ|工夫してひねり出すこと。
+罵倒|ばとう|ひどくののしること。
+剝奪|はくだつ|はぎ取ること。
+氾濫|はんらん|あふれること。
+汎用|はんよう|いろいろな用途に使えること。
+斑点|はんてん|まだらの点。
+眉間|みけん|まゆとまゆの間。
+訃報|ふほう|死去の知らせ。
+隠蔽|いんぺい|覆い隠して人の目に触れさせないこと。
+完璧|かんぺき|欠点がないこと。
+軽蔑|けいべつ|見下すこと。
+哺乳|ほにゅう|乳を飲ませて育てること。
+養蜂|ようほう|蜂を飼うこと。
+全貌|ぜんぼう|全体のありさま。
+親睦|しんぼく|親しみ仲良くすること。
+勃発|ぼっぱつ|突然起こること。
+枕元|まくらもと|寝ている頭のそば。
+蜜月|みつげつ|親密な時期。
+冥福|めいふく|死後の幸福。
+麺類|めんるい|めんの食べ物。
+陶冶|とうや|人格をきたえ育てること。
+闇夜|やみよ|暗い夜。
+比喩|ひゆ|たとえ。
+湧水|ゆうすい|わき水。
+妖怪|ようかい|ばけもの。
+肥沃|ひよく|土地が肥えていること。
+拉致|らち|無理に連れ去ること。
+辛辣|しんらつ|手厳しいこと。
+藍色|あいいろ|濃い青色。
+戦慄|せんりつ|恐ろしさに震えること。
+伴侶|はんりょ|連れ合い。
+明瞭|めいりょう|はっきりしていること。
+賄賂|わいろ|不正な贈り物。
+翻弄|ほんろう|もてあそぶこと。
+籠城|ろうじょう|城にこもること。
+山麓|さんろく|山のふもと。
+脇役|わきやく|主役を助ける役。
+椅子|いす|腰かけるための家具。
+宛先|あてさき|送り先。
+目尻|めじり|目の外側の端。
+腎臓|じんぞう|血液から尿を作る臓器。
+裾野|すその|山のふもとの広がり。
+曽祖父|そうそふ|祖父母の父。
+爪先|つまさき|足の指の先。
+冶金|やきん|鉱石から金属を取り出すこと。
+弥生|やよい|陰暦三月の呼び名。
+風呂|ふろ|湯につかって体を温める所。
+瑠璃|るり|青い宝石。`
+};
+const BUILTIN_VERSION = 2;
+const initialDataset = [];
+Object.entries(BUILTIN).forEach(([level, text]) => text.trim().split('\n').forEach(line => {
+  const [kanji, reading, meaning] = line.split('|');
+  initialDataset.push({ level, kanji, reading, meaning });
+}));
 const LEVELS = ['3級', '準2級', '2級'];
 
 // ===== 2. 状態 =====
@@ -239,7 +726,7 @@ function setStatus(t) { $('db-status').textContent = t; }
 function useMemory(reason) {
   if (started) return;
   started = true; db = null;
-  memoryCards = initialDataset.map((c, i) => ({ ...c, id: i + 1, status: 'unlearned', correct: 0, wrong: 0 }));
+  memoryCards = initialDataset.map((c, i) => ({ ...c, id: i + 1, status: 'unlearned', correct: 0, wrong: 0, lastSeen: 0 }));
   setStatus('一時保存（' + reason + '）');
   updateCounts(); loadLevel(currentLevel);
 }
@@ -247,7 +734,7 @@ function useMemory(reason) {
 function initDB() {
   const watchdog = setTimeout(() => useMemory('DB応答なし'), 3000);
   let req;
-  try { req = indexedDB.open('KanjiQuizDB', 1); }
+  try { req = indexedDB.open('KanjiQuizDB', 2); }
   catch (e) { clearTimeout(watchdog); useMemory('DB使用不可'); return; }
   req.onupgradeneeded = e => {
     const d = e.target.result;
@@ -255,27 +742,42 @@ function initDB() {
       const s = d.createObjectStore('kanji_cards', { keyPath: 'id', autoIncrement: true });
       s.createIndex('level', 'level', { unique: false });
     }
+    if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta');
   };
   req.onsuccess = e => {
     clearTimeout(watchdog);
     if (started) return;
     started = true; db = e.target.result;
-    setStatus('保存中（この端末）');
+    setStatus('保存中');
     seed();
   };
   req.onerror = () => { clearTimeout(watchdog); useMemory('DBエラー'); };
   req.onblocked = () => setStatus('他のタブで開いています');
 }
 
+// 内蔵データを入れる。古い版から更新したときは、学習記録を残したまま新しい問題を足す
 function seed() {
-  const c = db.transaction('kanji_cards').objectStore('kanji_cards').count();
-  c.onsuccess = () => {
-    if (c.result > 0) { updateCounts(); loadLevel(currentLevel); return; }
-    const tx = db.transaction('kanji_cards', 'readwrite');
-    const s = tx.objectStore('kanji_cards');
-    initialDataset.forEach(it => s.add({ ...it, status: 'unlearned', correct: 0, wrong: 0 }));
-    tx.oncomplete = () => { updateCounts(); loadLevel(currentLevel); };
+  const tx = db.transaction(['kanji_cards', 'meta'], 'readwrite');
+  const store = tx.objectStore('kanji_cards'), meta = tx.objectStore('meta');
+  const vr = meta.get('builtinVersion');
+  vr.onsuccess = () => {
+    if ((vr.result || 0) >= BUILTIN_VERSION) return;
+    const all = store.getAll();
+    all.onsuccess = () => {
+      const byKanji = new Map(all.result.map(c => [c.kanji, c]));
+      const builtinKanji = new Set(initialDataset.map(c => c.kanji));
+      // 旧版の内蔵データで、級の範囲外だったもの（躊躇・脆弱など）を外す
+      all.result.forEach(c => { if (!c.custom && !builtinKanji.has(c.kanji)) store.delete(c.id); });
+      initialDataset.forEach(it => {
+        const old = byKanji.get(it.kanji);
+        if (old) store.put({ ...old, level: it.level, reading: it.reading, meaning: it.meaning });
+        else store.add({ ...it, status: 'unlearned', correct: 0, wrong: 0, lastSeen: 0 });
+      });
+      meta.put(BUILTIN_VERSION, 'builtinVersion');
+    };
   };
+  tx.oncomplete = () => { updateCounts(); loadLevel(currentLevel); };
+  tx.onerror = () => { started = false; useMemory('DB更新失敗'); };
 }
 
 function updateCounts() {
@@ -288,9 +790,8 @@ function updateCounts() {
 }
 
 function orderCards(list) {
-  // 要復習 → 未学習 → 覚えた の順、同じ中はシャッフル
-  const rank = { review: 0, unlearned: 1, mastered: 2 };
-  return list.map(c => [rank[c.status] ?? 1, Math.random(), c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
+  // まだ出ていない問題 → 前回出てから時間がたった問題 の順。同じ中はシャッフル
+  return list.map(c => [c.lastSeen || 0, Math.random(), c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
 }
 
 function loadLevel(level) {
@@ -307,10 +808,18 @@ function saveCard(card) {
 }
 
 function record(card, ok) {
+  card.lastSeen = Date.now();
   if (ok) { card.correct = (card.correct || 0) + 1; card.status = 'mastered'; }
   else { card.wrong = (card.wrong || 0) + 1; card.status = 'review'; }
   saveCard(card);
   showStat(card);
+}
+// まちがえた問題は、20問ほどあとにもう一度出す（すぐには繰り返さない）
+function requeue(card) {
+  if (cards.length < 25) return;
+  if (cards.indexOf(card, idx + 1) > -1) return;
+  const pos = Math.min(idx + 20, cards.length);
+  cards.splice(pos, 0, card);
 }
 
 // ===== 4. 手書き判定（形の比較） =====
@@ -419,8 +928,11 @@ function judgeChar(st, ch) {
   const z = Math.max(0, corr(zones(u, 8), zones(t, 8)));
   return 0.65 * f + 0.35 * z;
 }
-const OK_LINE = 0.78, MID_LINE = 0.58;
-const grade = s => s >= OK_LINE ? 'ok' : s >= MID_LINE ? 'mid' : 'ng';
+// 判定のきびしさ（合格ライン）
+const STRICT = { easy: 0.45, normal: 0.55, hard: 0.68 };
+let strict = 'normal';
+try { strict = localStorage.getItem('kanken-strict') || 'normal'; } catch (e) {}
+const grade = s => s >= STRICT[strict] ? 'ok' : 'ng';
 
 // ===== 5. 手書きパッド =====
 const pad = $('pad'); let pctx, padSize = 0, cur = null;
@@ -516,14 +1028,9 @@ function showCard() {
 function judgeAll() {
   drawings[charIdx] = strokes;
   const card = cards[idx], chars = [...card.kanji];
-  const scores = chars.map((ch, i) => judgeChar(drawings[i] || [], ch));
-  const grades = scores.map(grade);
-  const allOk = grades.every(g => g === 'ok'), anyNg = grades.includes('ng');
-  const overall = allOk ? 'ok' : anyNg ? 'ng' : 'mid';
-  lastResult = { card, overall };
-
-  $('verdict').className = 'verdict ' + overall;
-  $('verdict').textContent = { ok: '◯ 正解', mid: '△ おしい？ 自分で確認', ng: '× まちがい' }[overall];
+  const grades = chars.map((ch, i) => grade(judgeChar(drawings[i] || [], ch)));
+  const ok = grades.every(g => g === 'ok');
+  lastResult = { card, ok };
   $('answer').textContent = card.kanji;
   $('meaning-w').textContent = card.meaning;
   const res = $('results'); res.innerHTML = '';
@@ -534,12 +1041,19 @@ function judgeAll() {
     const cv = document.createElement('canvas'); cv.width = cv.height = 156;
     drawStrokes(cv.getContext('2d'), drawings[i] || [], 156, 8, '#2d3748'); b.appendChild(cv);
     const m = document.createElement('div'); m.className = 'res-mark ' + grades[i];
-    m.textContent = { ok: '◯', mid: '△', ng: '×' }[grades[i]] + ' ' + Math.round(scores[i] * 100) + '点';
+    m.textContent = grades[i] === 'ok' ? '◯' : '×';
     w.append(b, m); res.appendChild(w);
   });
-  record(card, overall === 'ok');
-  $('override').hidden = overall === 'ok';
+  record(card, ok);
+  if (!ok) requeue(card);
+  showVerdict(ok, false);
   setView('result');
+}
+function showVerdict(ok, manual) {
+  $('verdict').className = 'verdict ' + (ok ? 'ok' : 'ng');
+  $('verdict').textContent = (ok ? '◯ 正解' : '× 不正解') + (manual ? '（手動）' : '');
+  $('override').textContent = ok ? '不正解にする' : '正解にする';
+  $('override').className = 'btn ' + (ok ? 'ng' : 'ok');
 }
 
 // 見るモードのタイマー
@@ -554,7 +1068,17 @@ function startTimer() {
   }, 1000);
 }
 
-function nextCard() { if (!cards.length) return; idx = (idx + 1) % cards.length; if (idx === 0) cards = orderCards(cards); showCard(); }
+function nextCard() {
+  if (!cards.length) return;
+  idx++;
+  if (idx >= cards.length) {
+    const last = cards[cards.length - 1];
+    cards = orderCards([...new Set(cards)]);
+    if (cards.length > 1 && cards[0] === last) cards.push(cards.shift());
+    idx = 0;
+  }
+  showCard();
+}
 
 // ===== 7. 音声 =====
 function speak(t) {
@@ -571,14 +1095,19 @@ $('next-char').onclick = () => {
   else judgeAll();
 };
 $('override').onclick = () => {
-  const c = lastResult.card; c.wrong = Math.max(0, (c.wrong || 1) - 1);
-  record(c, true);
-  $('verdict').className = 'verdict ok'; $('verdict').textContent = '◯ 正解（自分で判定）';
-  $('override').hidden = true;
+  const r = lastResult; if (!r) return;
+  const c = r.card;
+  if (r.ok) { c.correct = Math.max(0, (c.correct || 1) - 1); record(c, false); requeue(c); }
+  else {
+    c.wrong = Math.max(0, (c.wrong || 1) - 1); record(c, true);
+    const j = cards.indexOf(c, idx + 1); if (j > -1) cards.splice(j, 1);
+  }
+  r.ok = !r.ok;
+  showVerdict(r.ok, true);
 };
 $('next-q').onclick = nextCard;
-$('see-next').onclick = nextCard;
-$('mark-review').onclick = () => { if (cards[idx]) { record(cards[idx], false); nextCard(); } };
+$('see-next').onclick = () => { const c = cards[idx]; if (c) { c.lastSeen = Date.now(); saveCard(c); } nextCard(); };
+$('mark-review').onclick = () => { if (cards[idx]) { record(cards[idx], false); requeue(cards[idx]); nextCard(); } };
 $('mark-ok').onclick = () => { if (cards[idx]) { record(cards[idx], true); nextCard(); } };
 $('speak').onclick = () => cards[idx] && speak(cards[idx].reading);
 $('audio-toggle').onclick = () => {
@@ -614,7 +1143,7 @@ $('file-input').onchange = e => {
       } else list = JSON.parse(text);
       if (!Array.isArray(list) || !list.length) throw new Error();
     } catch (err) { alert('読み込めませんでした。JSON配列か「級,漢字,読み,意味」のCSVにしてください。'); return; }
-    const rows = list.map(it => ({ ...it, status: 'unlearned', correct: 0, wrong: 0 }));
+    const rows = list.map(it => ({ ...it, custom: true, status: 'unlearned', correct: 0, wrong: 0, lastSeen: 0 }));
     if (!db) {
       rows.forEach(it => memoryCards.push({ ...it, id: memoryCards.length + 1 }));
       alert(rows.length + '件を追加しました（このページを閉じると消えます）');
@@ -627,6 +1156,9 @@ $('file-input').onchange = e => {
   r.readAsText(f);
   e.target.value = '';
 };
+
+$('strict').value = strict;
+$('strict').onchange = e => { strict = e.target.value; try { localStorage.setItem('kanken-strict', strict); } catch (err) {} };
 
 // ===== 9. 起動 =====
 window.addEventListener('error', e => setStatus('エラー：' + e.message));
