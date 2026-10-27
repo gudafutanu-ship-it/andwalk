@@ -203,7 +203,7 @@
   </footer>
 
   <div class="data">
-    <span><span id="app-ver"></span> DB：<strong id="db-status">接続中</strong></span>
+    <span>DB状態：<strong id="db-status">接続中</strong></span>
     <select id="strict" aria-label="判定のきびしさ">
       <option value="easy">判定：やさしい</option>
       <option value="normal">判定：ふつう</option>
@@ -1164,22 +1164,8 @@ $('strict').onchange = e => { strict = e.target.value; try { localStorage.setIte
 window.addEventListener('error', e => setStatus('エラー：' + e.message));
 const boot = () => { (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {}); initDB(); };
 // アプリ化：オフライン用の仕組みを登録し、学習データを消されにくくする
-// アプリの版。index.html を直したら、この数字と sw.js の CACHE を一緒に上げる
-const APP_VERSION = 3;
-$('app-ver').textContent = 'v' + APP_VERSION;
-
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
-      // アプリに戻ってくるたびに、新しい版が出ていないか確認
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
-    }).catch(() => {});
-  });
-  // 新しい版に切り替わったら、一度だけ自動で読み直す
-  let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloaded) return; reloaded = true; location.reload();
-  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
