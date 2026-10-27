@@ -1,5 +1,5 @@
-// index.html を直したら、この番号を1つ上げてください（index.html の APP_VERSION と同じ数字に）
-const CACHE = 'kanken-v3';
+// アプリを更新したら、この番号を1つ上げてください（例：v2）
+const CACHE = 'kanken-v2';
 const FILES = [
   './',
   './index.html',
@@ -9,16 +9,12 @@ const FILES = [
   './icons/icon-512.png'
 ];
 
-// インストール時：ブラウザの一時保存を使わず、必ずGitHubから最新を取って保存
+// インストール時：アプリ本体をスマホに保存
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(FILES.map(u => new Request(u, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
 
-// 古い版の保存データを削除して、すぐに新しい版へ切り替え
+// 古い版の保存データを削除
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -31,10 +27,10 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
 
-  // ページ本体：毎回ネットから最新版（一時保存は使わない）。圏外なら保存した版
+  // ページ本体：まずネットから最新版、つながらなければ保存した版
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req, { cache: 'no-store' })
+      fetch(req)
         .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return res; })
         .catch(() => caches.match('./index.html'))
     );
